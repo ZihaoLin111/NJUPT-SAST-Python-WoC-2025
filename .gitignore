@@ -9,7 +9,7 @@ wheels/
 # Virtual environments
 .venv
 
-
+/.vscode
 /MTL/Task2/data/
 
 
