@@ -1,0 +1,1 @@
+{"timestamp": "2025-12-23 18:07:22", "model": "SRCNN", "epochs": 10, "optimizer": "Adam", "lr": 0.001, "train_acc_last": 0.005484425685608585, "val_acc_last": 31.179667592048645}

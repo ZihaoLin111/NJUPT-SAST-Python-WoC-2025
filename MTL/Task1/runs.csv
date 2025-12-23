@@ -1,0 +1,2 @@
+timestamp,model,epochs,optimizer,lr,train_loss_last,val_psnr_last
+2025-12-23 18:07:22,SRCNN,10,Adam,0.001,0.005484425685608585,31.179667592048645
