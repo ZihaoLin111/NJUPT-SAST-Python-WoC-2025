@@ -222,3 +222,8 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+MTL/Task1/denoised.png
+MTL/Task1/gt.png
+MTL/Task1/noisy_re.png
+MTL/Task1/noisy.png
+MTL/Task1/resized_gt.png
