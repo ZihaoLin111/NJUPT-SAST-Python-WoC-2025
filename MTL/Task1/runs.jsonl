@@ -1,3 +1,7 @@
 {"timestamp": "2025-12-23 18:07:22", "model": "SRCNN", "epochs": 10, "optimizer": "Adam", "lr": 0.001, "train_acc_last": 0.005484425685608585, "val_acc_last": 31.179667592048645}
 {"timestamp": "2025-12-23 20:31:37", "model": "SRCNN(batch:16)", "epochs": 10, "optimizer": "Adam", "lr": 0.001, "train_loss_last": 0.0077641335665248334, "val_psnr_last": 26.959474563598633}
 {"timestamp": "2025-12-23 21:05:56", "model": "SRCNN(batch:16)", "epochs": 10, "optimizer": "Adam", "lr": 0.001, "train_loss_last": 0.006091723858844489, "val_psnr_last": 28.4864501953125}
+{"timestamp": "2025-12-24 01:18:35", "model": "SRCNN", "epochs": 10, "optimizer": "Adam", "lr": 0.001, "train_loss_last": 0.001233349452377297, "val_psnr_last": 12.12637460231781}
+{"timestamp": "2025-12-24 02:12:08", "model": "SRCNN", "epochs": 10, "optimizer": "Adam", "lr": 0.001, "train_loss_last": 0.001914783744723536, "val_psnr_last": 28.48621702194214}
+{"timestamp": "2025-12-24 03:04:56", "model": "DnCNN", "epochs": 10, "optimizer": "Adam", "lr": 0.001, "train_loss_last": 0.012423262116499245, "val_psnr_last": 34.66104018688202}
+{"timestamp": "2025-12-24 10:21:36", "model": "DnCNN", "epochs": 10, "optimizer": "Adam", "lr": 0.001, "train_loss_last": 0.013523710891604424, "val_psnr_last": 35.82401764392853}

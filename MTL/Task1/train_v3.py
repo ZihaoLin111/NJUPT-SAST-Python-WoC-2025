@@ -10,29 +10,16 @@ from tqdm import tqdm
 import csv, json
 import matplotlib.pyplot as plt
 from pytorch_msssim import ssim
+from model import DnCNN
 
 transform = torchvision.transforms.Compose([
     torchvision.transforms.ToTensor()
 ])
-
-class SRCNN(nn.Module):
-    def __init__(self, num_channels=3):
-        super(SRCNN, self).__init__()
-        self.layer1 = nn.Conv2d(num_channels, 64, kernel_size=9, padding=4)
-        self.layer2 = nn.Conv2d(64, 32, kernel_size=1, padding=0)
-        self.layer3 = nn.Conv2d(32, num_channels, kernel_size=5, padding=2)
-        self.relu = nn.ReLU(inplace=True)
-
-    def forward(self, x):
-        x = self.relu(self.layer1(x))
-        x = self.relu(self.layer2(x))
-        x = self.layer3(x)
-        return x
     
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-net = SRCNN().to(device)
+net = DnCNN().to(device)
 
-criterion = nn.MSELoss()
+criterion = nn.L1Loss()
 optimizer = torch.optim.Adam(net.parameters(), lr=0.001)
 
 def psnr(img1, img2):
@@ -87,15 +74,13 @@ train_dataset, val_dataset, test_dataset = torch.utils.data.random_split(
     full_dataset, [train_size, val_size, test_size]
 ) 
 
-train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=16, shuffle=True)
-val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=16, shuffle=False)
-test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=16, shuffle=False)
+train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=8, shuffle=True)
+val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=8, shuffle=False)
+test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=8, shuffle=False)
 
 epochs = 10
 loss_list = []
 psnr_list = []
-initial_psnr = 0.0
-initial_ssim = 0.0
 for epoch in range(epochs):
     net.train()
     running_loss = 0.0
@@ -120,6 +105,10 @@ for epoch in range(epochs):
     total_psnr = 0.0
     total_ssim = 0.0
     count = 0
+    if epoch == 0:
+        initial_psnr = 0.0
+        initial_ssim = 0.0
+        initial_count = 0
     with torch.no_grad():
         for noisy_image, gt_image in val_loader:
             noisy_image = noisy_image.to(device)
@@ -128,7 +117,8 @@ for epoch in range(epochs):
                 for i in range(noisy_image.size(0)):
                     initial_psnr += psnr(noisy_image[i], gt_image[i]).item()
                     initial_ssim += ssim(noisy_image[i].unsqueeze(0), gt_image[i].unsqueeze(0), data_range=1.0).item() # SSIM要求4D输入
-            
+                    initial_count += 1
+
             outputs = net(noisy_image)
             
             # 限制在0-1之间
@@ -140,17 +130,23 @@ for epoch in range(epochs):
                 total_ssim += ssim(outputs[i].unsqueeze(0), gt_image[i].unsqueeze(0), data_range=1.0).item() # SSIM要求4D输入
             
             count += outputs.size(0)
+    if epoch == 0:
+        initial_psnr_avg = initial_psnr / initial_count
+        initial_ssim_avg = initial_ssim / initial_count
+    else:
+        # 使用第一个epoch保存的值
+        pass
     avg_loss = running_loss / len(train_loader)
     avg_psnr = total_psnr / count
     avg_ssim = total_ssim / count
     loss_list.append(avg_loss)
     psnr_list.append(avg_psnr)
     print(f'Epoch [{epoch+1}/{epochs}], Train Loss: {avg_loss:.4f}')
-    print(f'Iniatial: PSNR: {initial_psnr/16:.4f}dB, SSIM: {initial_ssim/16:.4f}  => Denoised: PSNR: {avg_psnr:.4f}dB, SSIM: {avg_ssim:.4f}')
+    print(f'Iniatial: PSNR: {initial_psnr_avg:.4f}dB, SSIM: {initial_ssim_avg:.4f}  => Denoised: PSNR: {avg_psnr:.4f}dB, SSIM: {avg_ssim:.4f}')
 
 # 保存模型
 save_folder = './saved_models'
-model_name = 'SRCNN'
+model_name = 'DnCNN'
 epoch = epochs
 timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M")
 
@@ -163,7 +159,7 @@ print(f"模型参数已保存至: {save_path}")
 
 run_log = {
     "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-    "model": "SRCNN",
+    "model": "DnCNN",
     "epochs": epochs,
     "optimizer": "Adam",
     "lr": 0.001,

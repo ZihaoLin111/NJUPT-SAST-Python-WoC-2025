@@ -10,32 +10,18 @@ from pytorch_msssim import ssim
 from PIL import Image
 import datetime
 import os
+from model import DnCNN
 
 
-model_path = './saved_models/SRCNN_20251223_2105_ep10_loss0.0061_psnr28.49dB.pth'
+model_path = './saved_models/DnCNN_20251224_1021_ep10_loss0.0135_psnr35.82dB.pth'
 data_path = 'data/SIDD_Small_sRGB_Only'
 
 transform = torchvision.transforms.Compose([
     torchvision.transforms.ToTensor(),
-    torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
 ])
 
-class SRCNN(nn.Module):
-    def __init__(self, num_channels=3):
-        super(SRCNN, self).__init__()
-        self.layer1 = nn.Conv2d(num_channels, 64, kernel_size=9, padding=4)
-        self.layer2 = nn.Conv2d(64, 32, kernel_size=1, padding=0)
-        self.layer3 = nn.Conv2d(32, num_channels, kernel_size=5, padding=2)
-        self.relu = nn.ReLU(inplace=True)
-
-    def forward(self, x):
-        x = self.relu(self.layer1(x))
-        x = self.relu(self.layer2(x))
-        x = self.layer3(x)
-        return x
-    
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-net = SRCNN().to(device)
+net = DnCNN().to(device)
 
 criterion = nn.MSELoss()
 optimizer = torch.optim.Adam(net.parameters(), lr=0.001)
@@ -101,8 +87,8 @@ net.load_state_dict(torch.load(model_path))
 net.eval()
 initial_psnr = 0
 initial_ssim = 0
-epoch_psnr = 0
-epoch_ssim = 0
+total_psnr = 0
+total_ssim = 0
 count = 0
 with torch.no_grad():
     for noisy_image, gt_image in test_loader:
@@ -110,26 +96,23 @@ with torch.no_grad():
         gt_image = gt_image.to(device)
 
         for i in range(noisy_image.size(0)):
-            initial_psnr += psnr(noisy_image[i] * 0.5 + 0.5, gt_image[i] * 0.5 + 0.5).item()
-            initial_ssim += ssim(noisy_image[i].unsqueeze(0) * 0.5 + 0.5, gt_image[i].unsqueeze(0) * 0.5 + 0.5, data_range=1.0).item() # SSIM要求4D输入
+            initial_psnr += psnr(noisy_image[i], gt_image[i]).item()
+            initial_ssim += ssim(noisy_image[i].unsqueeze(0), gt_image[i].unsqueeze(0), data_range=1.0).item() # SSIM要求4D输入
 
 
         outputs = net(noisy_image)
 
-        # 逆归一化
-        outputs = outputs * 0.5 + 0.5 
-        gt_image = gt_image * 0.5 + 0.5 
         # 限制在0-1之间
         outputs = torch.clamp(outputs, 0.0, 1.0)
         gt_image = torch.clamp(gt_image, 0.0, 1.0)
 
         for i in range(outputs.size(0)):
-            epoch_psnr += psnr(outputs[i], gt_image[i]).item()
-            epoch_ssim += ssim(outputs[i].unsqueeze(0), gt_image[i].unsqueeze(0), data_range=1.0).item() # SSIM要求4D输入
+            total_psnr += psnr(outputs[i], gt_image[i]).item()
+            total_ssim += ssim(outputs[i].unsqueeze(0), gt_image[i].unsqueeze(0), data_range=1.0).item() # SSIM要求4D输入
 
         count += outputs.size(0)
-    avg_psnr = epoch_psnr / count
-    avg_ssim = epoch_ssim / count
+    avg_psnr = total_psnr / count
+    avg_ssim = total_ssim / count
     avg_initial_psnr = initial_psnr / count
     avg_initial_ssim = initial_ssim / count
     
@@ -158,11 +141,11 @@ noisy_image = noisy_image.resize((512, 512))
 # 对照组1
 noisy_image_re_copy = noisy_image.resize((w, h))
 
-noisy_image = transform(noisy_image).to(device)
+noisy_image = transform(noisy_image).unsqueeze(0).to(device)
 
 outputs = net(noisy_image)
             
-outputs = outputs * 0.5 + 0.5 # 逆归一化
+outputs = outputs.squeeze(0)
 outputs = torch.clamp(outputs, 0.0, 1.0) # 限制在0-1之间
 # Tensor to PIL Image
 to_pil = torchvision.transforms.ToPILImage()

@@ -18,3 +18,24 @@ class SRCNN(nn.Module):
         x = self.relu(self.layer2(x))
         x = self.layer3(x)
         return x
+    
+
+class DnCNN(nn.Module):
+    def __init__(self, num_channels=3, num_features=64, num_layers=17):
+        super(DnCNN, self).__init__()
+        layers = []
+        # 第一层
+        layers.append(nn.Conv2d(num_channels, num_features, kernel_size=3, padding=1))
+        layers.append(nn.ReLU(inplace=True))
+        # 中间层
+        for _ in range(num_layers - 2):
+            layers.append(nn.Conv2d(num_features, num_features, kernel_size=3, padding=1))
+            layers.append(nn.BatchNorm2d(num_features))
+            layers.append(nn.ReLU(inplace=True))
+        # 最后一层
+        layers.append(nn.Conv2d(num_features, num_channels, kernel_size=3, padding=1))
+        self.dncnn = nn.Sequential(*layers)
+
+    def forward(self, x):
+        out = self.dncnn(x)
+        return x - out  # 残差学习
