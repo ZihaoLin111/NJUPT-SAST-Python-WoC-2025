@@ -1,12 +1,13 @@
 import os
 from torch.utils.data import Dataset
 from PIL import Image
-
+import random
 
 class SIDD_Dataset(Dataset):
-    def __init__(self, data_path, transform=None):
+    def __init__(self, data_path, transform=None, crop_size=0):
         self.transform = transform
         self.data_path = os.path.join(data_path, 'Data')
+        self.crop_size = crop_size
 
         # 读取Scene_Instances.txt文件
         scene_file = os.path.join(data_path, 'Scene_Instances.txt')
@@ -28,6 +29,13 @@ class SIDD_Dataset(Dataset):
         noisy_path, gt_path = self.samples[idx]
         noisy_image = Image.open(noisy_path).convert('RGB')
         gt_image = Image.open(gt_path).convert('RGB')
+
+        if self.crop_size > 0:
+            w, h = noisy_image.size
+            i = random.randint(0, h - self.crop_size)
+            j = random.randint(0, w - self.crop_size)
+            noisy_image = noisy_image.crop((j, i, j + self.crop_size, i + self.crop_size))
+            gt_image = gt_image.crop((j, i, j + self.crop_size, i + self.crop_size))
 
         if self.transform:
             noisy_image = self.transform(noisy_image)

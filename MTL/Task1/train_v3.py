@@ -11,6 +11,7 @@ import csv, json
 import matplotlib.pyplot as plt
 from pytorch_msssim import ssim
 from model import DnCNN
+from dataset import SIDD_Dataset
 
 transform = torchvision.transforms.Compose([
     torchvision.transforms.ToTensor()
@@ -20,7 +21,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 net = DnCNN().to(device)
 
 criterion = nn.L1Loss()
-optimizer = torch.optim.Adam(net.parameters(), lr=0.001)
+optimizer = torch.optim.Adam(net.parameters(), lr=5e-5)
 
 def psnr(img1, img2):
     mse = torch.mean((img1 - img2) ** 2)
@@ -28,44 +29,10 @@ def psnr(img1, img2):
         return 100
     return 20 * torch.log10(1.0 / torch.sqrt(mse))
 
-class SIDD_Dataset(Dataset):
-    def __init__(self, data_path, transform=None):
-        self.transform = transform
-        self.data_path = os.path.join(data_path, 'Data')
-
-        # 读取Scene_Instances.txt文件
-        scene_file = os.path.join(data_path, 'Scene_Instances.txt')
-        with open(scene_file, 'r') as f:
-            self.scene_instances = [line.strip() for line in f]
-
-        # 构建样本列表
-        self.samples = []
-        for folder in self.scene_instances:
-            nosiy_path = os.path.join(self.data_path, folder, 'NOISY_SRGB_010.PNG')
-            gt_path = os.path.join(self.data_path, folder, 'GT_SRGB_010.PNG')
-    
-            self.samples.append((nosiy_path, gt_path))
-            
-    def __len__(self):
-        return len(self.samples)
-        
-    def __getitem__(self, idx):
-        noisy_path, gt_path = self.samples[idx]
-        noisy_image = Image.open(noisy_path).convert('RGB')
-        gt_image = Image.open(gt_path).convert('RGB')
-
-        noisy_image = noisy_image.resize((512, 512))
-        gt_image = gt_image.resize((512, 512))
-
-        if self.transform:
-            noisy_image = self.transform(noisy_image)
-            gt_image = self.transform(gt_image)
-
-        return noisy_image, gt_image
     
 data_path = 'data/SIDD_Small_sRGB_Only'
 
-full_dataset = SIDD_Dataset(data_path, transform=transform)
+full_dataset = SIDD_Dataset(data_path, transform=transform, crop_size=512)
 
 train_size = int(0.8 * len(full_dataset))
 val_size = int(0.1 * len(full_dataset))
@@ -92,7 +59,8 @@ for epoch in range(epochs):
         optimizer.zero_grad()
         outputs = net(noisy_image)
         loss = criterion(outputs, gt_image)
-        loss.backward()
+        tricky_loss = loss - 0.1 * ssim(outputs, gt_image, data_range=1.0) + 0.1
+        tricky_loss.backward()
         optimizer.step()
         
         running_loss += loss.item()
@@ -105,19 +73,16 @@ for epoch in range(epochs):
     total_psnr = 0.0
     total_ssim = 0.0
     count = 0
-    if epoch == 0:
-        initial_psnr = 0.0
-        initial_ssim = 0.0
-        initial_count = 0
+    initial_psnr = 0.0
+    initial_ssim = 0.0
     with torch.no_grad():
         for noisy_image, gt_image in val_loader:
             noisy_image = noisy_image.to(device)
             gt_image = gt_image.to(device)
-            if epoch == 0:
-                for i in range(noisy_image.size(0)):
-                    initial_psnr += psnr(noisy_image[i], gt_image[i]).item()
-                    initial_ssim += ssim(noisy_image[i].unsqueeze(0), gt_image[i].unsqueeze(0), data_range=1.0).item() # SSIM要求4D输入
-                    initial_count += 1
+            for i in range(noisy_image.size(0)):
+                initial_psnr += psnr(noisy_image[i], gt_image[i]).item()
+                initial_ssim += ssim(noisy_image[i].unsqueeze(0), gt_image[i].unsqueeze(0), data_range=1.0).item() # SSIM要求4D输入
+
 
             outputs = net(noisy_image)
             
@@ -130,12 +95,8 @@ for epoch in range(epochs):
                 total_ssim += ssim(outputs[i].unsqueeze(0), gt_image[i].unsqueeze(0), data_range=1.0).item() # SSIM要求4D输入
             
             count += outputs.size(0)
-    if epoch == 0:
-        initial_psnr_avg = initial_psnr / initial_count
-        initial_ssim_avg = initial_ssim / initial_count
-    else:
-        # 使用第一个epoch保存的值
-        pass
+    initial_psnr_avg = initial_psnr / count
+    initial_ssim_avg = initial_ssim / count
     avg_loss = running_loss / len(train_loader)
     avg_psnr = total_psnr / count
     avg_ssim = total_ssim / count
@@ -182,17 +143,35 @@ with open(csv_path, "a", newline="", encoding="utf-8") as f:
     writer.writerow({k: run_log[k] for k in csv_fields})
 
 print("Logged to", jsonl_path, "and", csv_path)
-    
-# 绘制准确率曲线
-plt.plot(range(1, epochs+1), psnr_list, label='Validation PSNR')
-plt.xlabel('Epochs')
-plt.ylabel('Validation PSNR (dB)')
-plt.title('Training and Validation Accuracy')
-plt.legend()
 
-os.makedirs('charts', exist_ok=True)
-timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-fig_path = f"charts/train_val_PSNR_{timestamp}.png"
+epochs_range = range(1, epochs + 1)
+
+fig, ax1 = plt.subplots()
+# 左 y 轴：PSNR
+ax1.plot(epochs_range, psnr_list, label='PSNR (dB)', color='tab:blue')
+ax1.set_xlabel('Epoch')
+ax1.set_ylabel('PSNR (dB)', color='tab:blue')
+ax1.tick_params(axis='y', labelcolor='tab:blue')
+
+# 右 y 轴：Loss
+ax2 = ax1.twinx()
+ax2.plot(epochs_range, loss_list, label='loss', color='tab:orange')
+ax2.set_ylabel('Loss', color='tab:orange')
+ax2.tick_params(axis='y', labelcolor='tab:orange')
+ax2.set_ylim(0, 0.15)   
+
+# 标题
+plt.title('PSNR and Loss over Epochs')
+
+# 合并图例
+lines_1, labels_1 = ax1.get_legend_handles_labels()
+lines_2, labels_2 = ax2.get_legend_handles_labels()
+ax1.legend(lines_1 + lines_2, labels_1 + labels_2, loc='best')
+
+# 保存
+os.makedirs('test_result_charts', exist_ok=True)
+timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+fig_path = f"charts/train_val_PSNR_Loss_{timestamp}.png"
 plt.savefig(fig_path, dpi=300, bbox_inches='tight')
 print(f"图表已保存至 {fig_path}")
 

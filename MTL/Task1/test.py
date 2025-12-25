@@ -152,7 +152,7 @@ to_pil = torchvision.transforms.ToPILImage()
 outputs = to_pil(outputs)
 outputs = outputs.resize((w, h))
 
-# 对照组2
+# 对照组2 
 resize_gt = gt_image.resize((512, 512))
 resize_gt = resize_gt.resize((w, h))
 

@@ -5,3 +5,6 @@
 {"timestamp": "2025-12-24 02:12:08", "model": "SRCNN", "epochs": 10, "optimizer": "Adam", "lr": 0.001, "train_loss_last": 0.001914783744723536, "val_psnr_last": 28.48621702194214}
 {"timestamp": "2025-12-24 03:04:56", "model": "DnCNN", "epochs": 10, "optimizer": "Adam", "lr": 0.001, "train_loss_last": 0.012423262116499245, "val_psnr_last": 34.66104018688202}
 {"timestamp": "2025-12-24 10:21:36", "model": "DnCNN", "epochs": 10, "optimizer": "Adam", "lr": 0.001, "train_loss_last": 0.013523710891604424, "val_psnr_last": 35.82401764392853}
+{"timestamp": "2025-12-24 16:12:56", "model": "DnCNN", "epochs": 20, "optimizer": "Adam", "lr": 0.0001, "train_loss_last": 0.03703454602509737, "val_psnr_last": 26.073083758354187}
+{"timestamp": "2025-12-24 18:05:20", "model": "DnCNN", "epochs": 20, "optimizer": "Adam", "lr": 0.001, "train_loss_last": 0.037053014151751995, "val_psnr_last": 25.230993509292603}
+{"timestamp": "2025-12-24 21:29:17", "model": "DnCNN", "epochs": 10, "optimizer": "Adam", "lr": 0.001, "train_loss_last": 0.03928552649449557, "val_psnr_last": 27.669828295707703}
