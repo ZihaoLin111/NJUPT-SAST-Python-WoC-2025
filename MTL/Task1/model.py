@@ -141,7 +141,7 @@ class DUB(nn.Module): # Full DUB
 
 
 class DIDN(nn.Module):
-    def __init__(self, in_channels=3, out_channels=64, num_dub=3):
+    def __init__(self, in_channels=3, out_channels=128, num_dub=4):
         super(DIDN, self).__init__()
         self.entry = nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=1, padding=1)
         self.prelu = nn.PReLU(num_parameters=out_channels, init=0.25)
