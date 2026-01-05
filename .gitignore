@@ -227,3 +227,6 @@ MTL/Task1/gt.png
 MTL/Task1/noisy_re.png
 MTL/Task1/noisy.png
 MTL/Task1/resized_gt.png
+MTL/Task1/denoised_image.png
+MTL/Task1/ground_truth_image.png
+MTL/Task1/noisy_image.png
