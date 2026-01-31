@@ -31,21 +31,25 @@ class SIDD_Dataset(Dataset):
         noisy_image = Image.open(noisy_path).convert('RGB')
         gt_image = Image.open(gt_path).convert('RGB')
 
-        if self.crop_size > 0:
-            if self.train:
-                # 随机裁剪
-                w, h = noisy_image.size
-                i = random.randint(0, h - self.crop_size)
-                j = random.randint(0, w - self.crop_size)
-                noisy_image = noisy_image.crop((j, i, j + self.crop_size, i + self.crop_size))
-                gt_image = gt_image.crop((j, i, j + self.crop_size, i + self.crop_size))
-            else:
-                # 中心裁剪
-                w, h = noisy_image.size
-                i = (h - self.crop_size) // 2
-                j = (w - self.crop_size) // 2
-                noisy_image = noisy_image.crop((j, i, j + self.crop_size, i + self.crop_size))
-                gt_image = gt_image.crop((j, i, j + self.crop_size, i + self.crop_size))    
+        # resize to 512 * 512
+        noisy_image = noisy_image.resize((512, 512))
+        gt_image = gt_image.resize((512, 512))
+        
+        # if self.crop_size > 0:
+        #     if self.train:
+        #         # 随机裁剪
+        #         w, h = noisy_image.size
+        #         i = random.randint(0, h - self.crop_size)
+        #         j = random.randint(0, w - self.crop_size)
+        #         noisy_image = noisy_image.crop((j, i, j + self.crop_size, i + self.crop_size))
+        #         gt_image = gt_image.crop((j, i, j + self.crop_size, i + self.crop_size))
+        #     else:
+        #         # 中心裁剪
+        #         w, h = noisy_image.size
+        #         i = (h - self.crop_size) // 2
+        #         j = (w - self.crop_size) // 2
+        #         noisy_image = noisy_image.crop((j, i, j + self.crop_size, i + self.crop_size))
+        #         gt_image = gt_image.crop((j, i, j + self.crop_size, i + self.crop_size))    
             
 
         if self.transform:

@@ -18,7 +18,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 net = DIDN().to(device)
 
 criterion = nn.L1Loss()
-optimizer = torch.optim.Adam(net.parameters(), lr=0.001)
+optimizer = torch.optim.Adam(net.parameters(), lr=1e-4)
 
 def psnr(img1, img2):
     mse = torch.mean((img1 - img2) ** 2)
@@ -37,10 +37,10 @@ val_size = int(0.1 * len(full_dataset_train))
 train_dataset, _ = torch.utils.data.random_split(full_dataset_train, [train_size, len(full_dataset_train) - train_size])
 val_dataset, _ = torch.utils.data.random_split(full_dataset_val, [val_size, len(full_dataset_val) - val_size])
 
-train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=8, shuffle=True)
-val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=8, shuffle=False)
+train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=4, shuffle=True)
+val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=4, shuffle=False)
 
-epochs = 20
+epochs = 10
 loss_list = []
 psnr_list = []
 for epoch in range(epochs):
@@ -118,7 +118,7 @@ run_log = {
     "model": "DIDN",
     "epochs": epochs,
     "optimizer": "Adam",
-    "lr": 0.001,
+    "lr": 1e-4,
     "train_loss_last": loss_list[-1],
     "val_psnr_last": psnr_list[-1],
 }

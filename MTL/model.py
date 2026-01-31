@@ -113,7 +113,50 @@ class DIDN(nn.Module):
         x = self.exit(x)
         return x + res1
 
-class SharedLayer(nn.Module):
-    def __init__(self, in_channels=3, out_channels=128):
-        super(SharedLayer, self).__init__()
+class MTL(nn.Module):
+    def __init__(self, in_channels=3, out_channels=128, dub_num=4):
+        super(MTL, self).__init__()
+
+        # Shared Layers
+        self.entry = nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1)
+        self.prelu = nn.PReLU(num_parameters=out_channels, init=0.25)
+        self.dub_blocks = nn.ModuleList([DUB(out_channels, out_channels) for _ in range(dub_num)])
+
+        # For Task 1
+        self.exit = nn.Conv2d(out_channels, in_channels, kernel_size=3, padding=1)
+
+        # For Task 2
+        self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2)
+        self.conv = nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1)
+        self.prelu_21 = nn.PReLU(num_parameters=out_channels, init=0.25)
+        self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2)
+        self.fc1 = nn.Linear((out_channels) * 8 * 8, 512) 
+        self.prelu_22 = nn.PReLU(num_parameters=512, init=0.25)
+        self.fc2 = nn.Linear(512, 128)
+        self.prelu_23 = nn.PReLU(num_parameters=128, init=0.25)
+        self.classifier = nn.Linear(128, 10)
+
+    def forward(self, x, task='all'):
+
+        shared_feat = self.entry(x)
+        shared_feat = self.prelu(shared_feat)
+        for dub in self.dub_blocks:
+            shared_feat = dub(shared_feat)
+
+        out1, out2 = None, None
+
+        if task == 'task1' or task == 'all':
+            out1 = self.exit(shared_feat)
+
+        if task == 'task2' or task == 'all':
+            out2 = self.pool1(shared_feat)
+            out2 = self.prelu_21(self.conv(out2))
+            out2 = self.pool2(out2)
+            out2 = out2.view(out2.size(0), -1)
+            out2 = self.prelu_22(self.fc1(out2))
+            out2 = self.prelu_23(self.fc2(out2))
+            out2 = self.classifier(out2)
+        
+        return out1, out2
+
         

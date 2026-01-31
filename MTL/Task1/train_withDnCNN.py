@@ -59,8 +59,7 @@ for epoch in range(epochs):
         optimizer.zero_grad()
         outputs = net(noisy_image)
         loss = criterion(outputs, gt_image)
-        tricky_loss = loss - 0.1 * ssim(outputs, gt_image, data_range=1.0) + 0.1
-        tricky_loss.backward()
+        loss.backward()
         optimizer.step()
         
         running_loss += loss.item()
