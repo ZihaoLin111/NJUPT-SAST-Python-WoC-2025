@@ -1,58 +1,101 @@
-from calendar import c
 from matplotlib.pylab import f
 import torch
 import torch.nn as nn
 import torchvision
-from model import DUB, DIDN
 import tqdm
 from pytorch_msssim import ssim
 import datetime
 import os
 import json
-import csv
 import matplotlib.pyplot as plt
-from model import DUB
+from model import DUB, ResBlock
 import numpy as np
 from torch.utils.data import Dataset, DataLoader
 from PIL import Image
-from itertools import count, cycle
+from itertools import cycle
+import random
 
 class Basetest(nn.Module):
-    def __init__(self, in_channels=3, out_channels=64, dub_num=4):
+    def __init__(self, in_channels=3, out_channels=64, num_classes=10):
         super(Basetest, self).__init__()
 
+        # Shared Layers
         self.entry = nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1)
-        self.prelu = nn.PReLU(num_parameters=out_channels, init=0.25)
-        self.dub_blocks = nn.ModuleList([DUB(out_channels, out_channels) for _ in range(dub_num)])
+        # self.bn1 = nn.BatchNorm2d(out_channels)
+        self.relu = nn.ReLU()
+        
+        self.dublayer1 = nn.Sequential(
+            DUB(out_channels, out_channels),
+            DUB(out_channels, out_channels),
+            DUB(out_channels, out_channels)
+        )
 
-        self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2)
-        self.conv = nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1)
-        self.prelu_21 = nn.PReLU(num_parameters=out_channels, init=0.25)
-        self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2)
-        self.fc1 = nn.Linear((out_channels) * 8 * 8, 512) 
-        self.prelu_22 = nn.PReLU(num_parameters=512, init=0.25)
-        self.fc2 = nn.Linear(512, 128)
-        self.prelu_23 = nn.PReLU(num_parameters=128, init=0.25)
-        self.classifier = nn.Linear(128, 10)
+        # # For Task 1
+        # self.dublayer2 = nn.Sequential(
+        #     DUB(out_channels, out_channels)
+        # )
+        # self.exit = nn.Conv2d(out_channels, in_channels, kernel_size=3, padding=1)
 
-    def forward(self, x):
+        # For Task 2
+        self.reslayer1 = nn.Sequential(
+            ResBlock(out_channels, out_channels, stride=1),
+            ResBlock(out_channels, out_channels, stride=1)
+        )
+        self.reslayer2 = nn.Sequential(
+            ResBlock(out_channels, out_channels*2, stride=2),
+            ResBlock(out_channels*2, out_channels*2, stride=1)
+        )
+        self.reslayer3 = nn.Sequential(
+            ResBlock(out_channels*2, out_channels*4, stride=2),
+            ResBlock(out_channels*4, out_channels*4, stride=1)
+        )
+        self.reslayer4 = nn.Sequential(
+            ResBlock(out_channels*4, out_channels*8, stride=2),
+            ResBlock(out_channels*8, out_channels*8, stride=1)
+        )
+
+        # # For Task ALL
+        # self.reslayer11 = nn.Sequential(
+        #     ResBlock(in_channels, out_channels, stride=1),
+        #     ResBlock(out_channels, out_channels, stride=1)
+        # )
+
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        self.flaten = nn.Flatten()
+        self.fc = nn.Linear(out_channels*8, num_classes)
+
+    def forward(self, x, task='all'):
 
         shared_feat = self.entry(x)
-        shared_feat = self.prelu(shared_feat)
-        for dub in self.dub_blocks:
-            shared_feat = dub(shared_feat)
+        # shared_feat = self.bn1(shared_feat)
+        shared_feat = self.relu(shared_feat)
+        shared_feat = self.dublayer1(shared_feat)
 
-        out = self.pool1(shared_feat)
-        out = self.conv(out)
-        out = self.prelu_21(out)
-        out = self.pool2(out)
-        out = out.view(out.size(0), -1)
-        out = self.fc1(out)
-        out = self.prelu_22(out)
-        out = self.fc2(out)
-        out = self.prelu_23(out)
-        out = self.classifier(out)
-        return out
+        out1, out2, out3 = None, None, None
+
+        # if task == 'task1' or task == 'all':
+        #     task1_feat = self.dublayer2(shared_feat)
+        #     out1 = self.exit(task1_feat)
+
+        if task == 'task2' or task == 'all':
+            task2_feat = self.reslayer1(shared_feat)
+            task2_feat = self.reslayer2(task2_feat)
+            task2_feat = self.reslayer3(task2_feat)
+            task2_feat = self.reslayer4(task2_feat)
+            task2_feat = self.avgpool(task2_feat)
+            task2_feat = self.flaten(task2_feat)
+            out2 = self.fc(task2_feat)
+
+        # if task == 'all':
+        #     out3 = self.reslayer11(out1)
+        #     out3 = self.reslayer2(out3)
+        #     out3 = self.reslayer3(out3)
+        #     out3 = self.reslayer4(out3)
+        #     out3 = self.avgpool(out3)
+        #     out3 = self.flaten(out3)
+        #     out3 = self.fc(out3)
+        
+        return out2
     
 CIFAR10C_transform = torchvision.transforms.Compose([
     torchvision.transforms.ToTensor(),

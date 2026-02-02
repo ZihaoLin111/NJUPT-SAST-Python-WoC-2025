@@ -113,7 +113,7 @@ class DIDN(nn.Module):
         x = self.exit(x)
         return x + res1
 
-class MTL(nn.Module):
+class MTL(nn.Module): # 结合DUB和普通的CNN
     def __init__(self, in_channels=3, out_channels=128, dub_num=4):
         super(MTL, self).__init__()
 
@@ -159,4 +159,97 @@ class MTL(nn.Module):
         
         return out1, out2
 
+
+class ResBlock(nn.Module):
+    def __init__(self, in_channels, out_channels, stride=1):
+        super(ResBlock, self).__init__()
+        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=stride, padding=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(out_channels)
+        self.relu = nn.ReLU()
+
+        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=1, padding=1, bias=False)
+        self.bn2 = nn.BatchNorm2d(out_channels)
+
+        self.shortcut = nn.Sequential()
+        if in_channels != out_channels or stride != 1:
+            self.shortcut = nn.Sequential(
+                nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=stride, bias=False),
+                nn.BatchNorm2d(out_channels)
+            )
+        self.relu = nn.ReLU()
+    
+    def forward(self, x):
+        out = self.relu(self.bn1(self.conv1(x)))
+        out = self.bn2(self.conv2(out))
+        out += self.shortcut(x)
+        out = self.relu(out)
+        return out
         
+
+class Res_DUB_MTL(nn.Module):
+    def __init__(self, in_channels=3, out_channels=64, num_classes=10):
+        super(Res_DUB_MTL, self).__init__()
+
+        # Shared Layers
+        self.entry = nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1)
+        self.bn1 = nn.BatchNorm2d(out_channels)
+        self.relu = nn.ReLU()
+        self.reslayer1 = nn.Sequential(
+            ResBlock(out_channels, out_channels, stride=1),
+            ResBlock(out_channels, out_channels, stride=1)
+        )
+        self.dublayer1 = nn.Sequential(
+            DUB(out_channels, out_channels),
+            DUB(out_channels, out_channels)
+        )
+
+        # For Task 1
+        self.dublayer2 = nn.Sequential(
+            DUB(out_channels, out_channels),
+            DUB(out_channels, out_channels)
+        )
+        self.exit = nn.Conv2d(out_channels, in_channels, kernel_size=3, padding=1)
+
+        # For Task 2
+        self.reslayer2 = nn.Sequential(
+            ResBlock(out_channels, out_channels*2, stride=2),
+            ResBlock(out_channels*2, out_channels*2, stride=1)
+        )
+        self.reslayer3 = nn.Sequential(
+            ResBlock(out_channels*2, out_channels*4, stride=2),
+            ResBlock(out_channels*4, out_channels*4, stride=1)
+        )
+        self.reslayer4 = nn.Sequential(
+            ResBlock(out_channels*4, out_channels*8, stride=2),
+            ResBlock(out_channels*8, out_channels*8, stride=1)
+        )
+
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        self.flaten = nn.Flatten()
+        self.fc = nn.Linear(out_channels*8, num_classes)
+
+    def forward(self, x, task='all'):
+
+        shared_feat = self.entry(x)
+        shared_feat = self.bn1(shared_feat)
+        shared_feat = self.relu(shared_feat)
+        shared_feat = self.reslayer1(shared_feat)
+        shared_feat = self.dublayer1(shared_feat)
+
+        out1, out2 = None, None
+
+        if task == 'task1' or task == 'all':
+            task1_feat = self.dublayer2(shared_feat)
+            out1 = self.exit(task1_feat)
+
+        if task == 'task2' or task == 'all':
+            task2_feat = self.reslayer2(shared_feat)
+            task2_feat = self.reslayer3(task2_feat)
+            task2_feat = self.reslayer4(task2_feat)
+            task2_feat = self.avgpool(task2_feat)
+            task2_feat = self.flaten(task2_feat)
+            out2 = self.fc(task2_feat)
+        
+        return out1, out2
+
+       
