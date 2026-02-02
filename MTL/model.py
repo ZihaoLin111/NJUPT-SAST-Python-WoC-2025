@@ -1,3 +1,4 @@
+from numpy import dtype
 import torch
 import torch.nn as nn
 
@@ -253,3 +254,18 @@ class Res_DUB_MTL(nn.Module):
         return out1, out2
 
        
+class UncertaintyWeightingLoss(nn.Module):
+    def __init__(self, task_num):
+        super(UncertaintyWeightingLoss, self).__init__()
+        self.log_vars = nn.Parameter(torch.zeros(task_num))
+
+    def forward(self, losses):
+        dtype = losses[0].dtype
+        device = losses[0].device
+        log_vars = self.log_vars.to(dtype).to(device)
+        vars = torch.exp(log_vars) 
+        total_loss = 0
+        for i, loss in enumerate(losses):
+            L = loss / (2 * vars[i]) + 0.5 * log_vars[i]
+            total_loss += L
+        return total_loss

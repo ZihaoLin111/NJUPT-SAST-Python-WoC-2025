@@ -93,6 +93,21 @@ class Res_DUB_MTL(nn.Module):
         
         return out1, out2, out3
     
+class UncertaintyWeightingLoss(nn.Module):
+    def __init__(self, task_num):
+        super(UncertaintyWeightingLoss, self).__init__()
+        self.log_vars = nn.Parameter(torch.zeros(task_num))
+
+    def forward(self, losses):
+        dtype = losses[0].dtype
+        device = losses[0].device
+        log_vars = self.log_vars.to(dtype).to(device)
+        vars = torch.exp(log_vars) 
+        total_loss = 0
+        for i, loss in enumerate(losses):
+            L = loss / (2 * vars[i]) + 0.5 * log_vars[i]
+            total_loss += L
+        return total_loss
 
 SIDD_transform = torchvision.transforms.Compose([
     torchvision.transforms.ToTensor()
@@ -254,7 +269,11 @@ net = Res_DUB_MTL().to(device)
 
 criterion_task1 = nn.L1Loss()
 criterion_task2 = nn.CrossEntropyLoss()
-optimizer = torch.optim.Adam(net.parameters(), lr=1e-4)
+mtl_loss = UncertaintyWeightingLoss(task_num=4)
+optimizer = torch.optim.Adam([
+    {'params':net.parameters()}, 
+    {'params':mtl_loss.parameters(), 'lr':1e-3}
+    ],lr=1e-4)
 
 def psnr(img1, img2):
     mse = torch.mean((img1 - img2) ** 2)
@@ -264,8 +283,8 @@ def psnr(img1, img2):
 
 
 epochs = 20
-task1_weight = 5.0
-task2_weight = 0.5
+# task1_weight = 5.0
+# task2_weight = 0.5
 
 loader_len = max(len(SIDD_train_dataloader), len(CIFAR10_train_dataloader))
 SIDD_Iter = cycle(SIDD_train_dataloader)
@@ -278,6 +297,7 @@ accuracy_a_list = []
 accuracy_b_list = []
 
 for epoch in range(epochs):
+    mtl_loss.train()
     net.train()
     running_loss = 0.0
     pbar = tqdm.tqdm(range(loader_len),desc=f"Epoch {epoch+1}/{epochs} Training",unit="batch")
@@ -302,7 +322,7 @@ for epoch in range(epochs):
         loss_task2_b = criterion_task2(class_outputs_b, class_labels)
         # (loss_task2*task2_weight).backward()
 
-        total_loss = (loss_task1_a*task1_weight + loss_task1_b*task1_weight + loss_task2_a*task2_weight+loss_task2_b*(task1_weight+task2_weight))/(task1_weight*3 + task2_weight*2)
+        total_loss = mtl_loss([loss_task1_a, loss_task1_b, loss_task2_a, loss_task2_b])
         total_loss.backward()
 
         optimizer.step()
@@ -313,6 +333,7 @@ for epoch in range(epochs):
 
     pbar.close()
 
+    mtl_loss.eval()
     net.eval()
     initial_psnr_1 = 0.0
     initial_ssim_1 = 0.0
