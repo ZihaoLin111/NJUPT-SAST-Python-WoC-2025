@@ -14,6 +14,7 @@ from torch.utils.data import Dataset, DataLoader
 from PIL import Image
 from itertools import cycle
 import random
+from pcgrad import PCGrad
 
 class Res_DUB_MTL(nn.Module):
     def __init__(self, in_channels=3, out_channels=64, num_classes=10):
@@ -270,10 +271,12 @@ net = Res_DUB_MTL().to(device)
 criterion_task1 = nn.L1Loss()
 criterion_task2 = nn.CrossEntropyLoss()
 mtl_loss = UncertaintyWeightingLoss(task_num=4)
-optimizer = torch.optim.Adam([
+base_optimizer = torch.optim.Adam([
     {'params':net.parameters()}, 
     {'params':mtl_loss.parameters(), 'lr':1e-3}
     ],lr=1e-4)
+
+optimizer = PCGrad(base_optimizer)
 
 def psnr(img1, img2):
     mse = torch.mean((img1 - img2) ** 2)
