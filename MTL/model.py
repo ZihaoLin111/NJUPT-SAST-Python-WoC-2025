@@ -269,3 +269,66 @@ class UncertaintyWeightingLoss(nn.Module):
             L = loss / (2 * vars[i]) + 0.5 * log_vars[i]
             total_loss += L
         return total_loss
+    
+
+class DnCNN(nn.Module):
+    def __init__(self, num_channels=3, num_features=64, num_layers=17):
+        super(DnCNN, self).__init__()
+        layers = []
+        # 第一层
+        layers.append(nn.Conv2d(num_channels, num_features, kernel_size=3, padding=1))
+        layers.append(nn.ReLU(inplace=True))
+        # 中间层
+        for _ in range(num_layers - 2):
+            layers.append(nn.Conv2d(num_features, num_features, kernel_size=3, padding=1))
+            layers.append(nn.BatchNorm2d(num_features))
+            layers.append(nn.ReLU(inplace=True))
+        # 最后一层
+        layers.append(nn.Conv2d(num_features, num_channels, kernel_size=3, padding=1))
+        self.dncnn = nn.Sequential(*layers)
+
+    def forward(self, x):
+        out = self.dncnn(x)
+        return x - out  # 残差学习
+    
+
+class ResNet18(nn.Module): # Specialized for CIFAR-10:去掉了maxpool, kernel_size=3
+    def __init__(self, num_classes=10, in_channels=3, out_channels=64):
+        super(ResNet18, self).__init__()
+        # Head
+        self.conv_head = nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=1, padding=1, bias=False)
+        self.bn_head = nn.BatchNorm2d(out_channels)
+        self.relu = nn.ReLU()
+
+        # Layers
+        self.layer1 = nn.Sequential(
+            ResBlock(out_channels, out_channels, stride=1),
+            ResBlock(out_channels, out_channels, stride=1)
+        )
+        self.layer2 = nn.Sequential(
+            ResBlock(out_channels, out_channels*2, stride=2),
+            ResBlock(out_channels*2, out_channels*2, stride=1)
+        )
+        self.layer3 = nn.Sequential(
+            ResBlock(out_channels*2, out_channels*4, stride=2),
+            ResBlock(out_channels*4, out_channels*4, stride=1)
+        )
+        self.layer4 = nn.Sequential(
+            ResBlock(out_channels*4, out_channels*8, stride=2),
+            ResBlock(out_channels*8, out_channels*8, stride=1)
+        )
+
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        self.flaten = nn.Flatten()
+        self.fc = nn.Linear(out_channels*8, num_classes)
+
+    def forward(self, x):
+        out = self.relu(self.bn_head(self.conv_head(x)))
+        out = self.layer1(out)
+        out = self.layer2(out)
+        out = self.layer3(out)
+        out = self.layer4(out)
+        out = self.avgpool(out)
+        out = self.flaten(out)
+        out = self.fc(out)
+        return out

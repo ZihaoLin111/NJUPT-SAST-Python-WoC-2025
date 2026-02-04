@@ -7,6 +7,7 @@ import os, time, datetime
 import tqdm
 
 transform = torchvision.transforms.Compose([
+    torchvision.transforms.RandomCrop(32, padding=4), # 随机裁剪
     torchvision.transforms.RandomHorizontalFlip(), # 随机旋转
     torchvision.transforms.ToTensor(),
     torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616))
@@ -23,29 +24,39 @@ trainset, valset = torch.utils.data.random_split(full_trainset, [45000, 5000])
 
 trainloader = torch.utils.data.DataLoader(
     trainset, 
-    batch_size=128, 
+    batch_size=256, 
     shuffle=True, 
     num_workers=4
 )
 valloader = torch.utils.data.DataLoader(
     valset,
-    batch_size=128,
+    batch_size=256,
     shuffle=False,
     num_workers=4
 )
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-net = ResNet18().to(device)
+res_net = ResNet18().to(device)
 
 criterion = nn.CrossEntropyLoss()
-optimizer = torch.optim.Adam(net.parameters(), lr=1e-4)
+optimizer = torch.optim.SGD(
+    res_net.parameters(),
+    lr=0.1,
+    momentum=0.9,
+    weight_decay=5e-4
+)
 
-epochs = 20
+scheduler = torch.optim.lr_scheduler.MultiStepLR(
+    optimizer,
+    milestones=[50, 100],
+    gamma=0.1
+)
+epochs = 150
 train_acc_lst = []
 val_acc_lst = []
 
 for epoch in range(epochs):
-    net.train()
+    res_net.train()
     running_loss = 0.0
     correct = 0
     total = 0
@@ -56,7 +67,7 @@ for epoch in range(epochs):
 
         optimizer.zero_grad()
 
-        outputs = net(inputs)
+        outputs = res_net(inputs)
         loss = criterion(outputs, labels)
         loss.backward()
         optimizer.step()
@@ -69,14 +80,14 @@ for epoch in range(epochs):
     train_acc = 100. * correct / total
     train_acc_lst.append(train_acc)
 
-    net.eval()
+    res_net.eval()
     val_correct = 0
     val_total = 0
 
     with torch.no_grad():
         for inputs, labels in valloader:
             inputs, labels = inputs.to(device), labels.to(device)
-            outputs = net(inputs)
+            outputs = res_net(inputs)
             _, predicted = outputs.max(1)
             val_total += labels.size(0)
             val_correct += predicted.eq(labels).sum().item()
@@ -112,6 +123,6 @@ timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M")
 os.makedirs(save_folder, exist_ok=True)
 filename = f"{model_name}_{timestamp}_ep{epoch}_acc{val_acc:.3f}.pth"
 save_path = os.path.join(save_folder, filename)
-torch.save(net.state_dict(), save_path)
+torch.save(res_net.state_dict(), save_path)
 
 print(f"模型参数已保存至: {save_path}")
