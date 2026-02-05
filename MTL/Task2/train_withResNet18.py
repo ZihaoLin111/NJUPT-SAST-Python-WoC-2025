@@ -5,10 +5,16 @@ import matplotlib.pyplot as plt
 from model import ResBlock, ResNet18
 import os, time, datetime
 import tqdm
+import json
 
-transform = torchvision.transforms.Compose([
+transform_train = torchvision.transforms.Compose([
     torchvision.transforms.RandomCrop(32, padding=4), # 随机裁剪
     torchvision.transforms.RandomHorizontalFlip(), # 随机旋转
+    torchvision.transforms.ToTensor(),
+    torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616))
+])
+
+transform_val = torchvision.transforms.Compose([
     torchvision.transforms.ToTensor(),
     torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616))
 ])
@@ -17,10 +23,11 @@ full_trainset = torchvision.datasets.CIFAR10(
     root='./data', 
     train=True,
     download=True,
-    transform=transform
+    transform=transform_train
 )
 
 trainset, valset = torch.utils.data.random_split(full_trainset, [45000, 5000])
+valset.dataset.transform = transform_val
 
 trainloader = torch.utils.data.DataLoader(
     trainset, 
@@ -48,7 +55,7 @@ optimizer = torch.optim.SGD(
 
 scheduler = torch.optim.lr_scheduler.MultiStepLR(
     optimizer,
-    milestones=[50, 100],
+    milestones=[100, 125],
     gamma=0.1
 )
 epochs = 150
@@ -77,6 +84,8 @@ for epoch in range(epochs):
         total += labels.size(0)
         correct += predicted.eq(labels).sum().item()
 
+    scheduler.step()
+
     train_acc = 100. * correct / total
     train_acc_lst.append(train_acc)
 
@@ -97,6 +106,11 @@ for epoch in range(epochs):
 
     print(f'Epoch {epoch+1}/{epochs}, Loss: {running_loss/len(trainloader):.4f}, Train Acc: {train_acc:.2f}%, Val Acc: {val_acc:.2f}%')
 
+best_train_acc = max(train_acc_lst)
+print(f'Best Training Accuracy: {best_train_acc:.2f}%')
+best_val_acc = max(val_acc_lst)
+print(f'Best Validation Accuracy: {best_val_acc:.2f}%')
+
 # 绘制准确率曲线
 plt.plot(range(1, epochs+1), train_acc_lst, label='Train Accuracy')
 plt.plot(range(1, epochs+1), val_acc_lst, label='Validation Accuracy')
@@ -111,17 +125,30 @@ fig_path = f"charts/train_val_acc_{timestamp}.png"
 plt.savefig(fig_path, dpi=300, bbox_inches='tight')
 print(f"图表已保存至 {fig_path}")
 
-plt.show()
+plt.close()
+
+# 保存json
+log_data = {
+    'network': 'ResNet18',
+    'optimizer': 'SGD',
+    'epochs': epochs,
+    'train_acc': best_train_acc,
+    'val_acc': best_val_acc
+}
+jsonl_path = "runs.jsonl"
+with open(jsonl_path, 'a') as f:
+    f.write(json.dumps(log_data) + '\n')
 
 # 保存模型
 save_folder = './saved_models'
 model_name = 'ResNet18'
 epoch = epochs
-val_acc = val_acc_lst[-1]
+best_train_acc = best_train_acc
+best_val_acc = best_val_acc
 timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M")
 
 os.makedirs(save_folder, exist_ok=True)
-filename = f"{model_name}_{timestamp}_ep{epoch}_acc{val_acc:.3f}.pth"
+filename = f"{model_name}_{timestamp}_ep{epoch}_train_best_acc_{best_train_acc:.3f}val_best_acc{best_val_acc:.3f}.pth"
 save_path = os.path.join(save_folder, filename)
 torch.save(res_net.state_dict(), save_path)
 

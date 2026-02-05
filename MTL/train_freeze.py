@@ -1,3 +1,4 @@
+from calendar import c
 from matplotlib.pylab import f
 import torch
 import torch.nn as nn
@@ -18,9 +19,8 @@ from pcgrad import PCGrad
 
 
 class PairedCIFAR10(Dataset):
-    def __init__(self, clean_path, corrupted_path, transform=None, transformc=None, corruption_type="gaussian_noise", severity=1):
+    def __init__(self, clean_path, corrupted_path, transform=None, corruption_type="gaussian_noise", severity=1):
         self.transform = transform
-        self.transformc = transformc
 
         self.clean_dataset = torchvision.datasets.CIFAR10(
             root=clean_path,
@@ -45,17 +45,17 @@ class PairedCIFAR10(Dataset):
 
         if self.transform:
             clean_img = self.transform(clean_img)
-
-        if self.transformc:
-            corrupted_img = self.transformc(corrupted_img)
+            corrupted_img = self.transform(corrupted_img)
 
         return corrupted_img, clean_img, label
     
-CIFAR10_transform = torchvision.transforms.Compose([
+CIFAR10_train_transform = torchvision.transforms.Compose([
+    torchvision.transforms.RandomCrop(32, padding=4), # 随机裁剪
+    torchvision.transforms.RandomHorizontalFlip(), # 随机旋转
     torchvision.transforms.ToTensor()
 ])
 
-CIFAR10C_transform = torchvision.transforms.Compose([
+CIFAR10_val_transform = torchvision.transforms.Compose([
     torchvision.transforms.ToTensor()
 ])
 
@@ -65,8 +65,7 @@ corrupted_path = "MTL/data/CIFAR-10-C"
 full_cifar10_dataset = PairedCIFAR10(
     clean_path=clean_path,
     corrupted_path=corrupted_path,
-    transform=CIFAR10_transform,
-    transformc=CIFAR10C_transform,
+    transform=CIFAR10_train_transform,
     corruption_type="gaussian_noise",
     severity=1
 )
@@ -74,6 +73,7 @@ full_cifar10_dataset = PairedCIFAR10(
 CIFAR10_train_size = int(0.9 * len(full_cifar10_dataset))
 CIFAR10_val_size = len(full_cifar10_dataset) - CIFAR10_train_size
 CIFAR10_train_dataset, CIFAR10_val_dataset = torch.utils.data.random_split(full_cifar10_dataset, [CIFAR10_train_size, CIFAR10_val_size])
+CIFAR10_val_dataset.dataset.transform = CIFAR10_val_transform
 CIFAR10_train_dataloader = DataLoader(CIFAR10_train_dataset, batch_size=256, shuffle=True, num_workers=4)
 CIFAR10_val_dataloader = DataLoader(CIFAR10_val_dataset, batch_size=256, shuffle=False, num_workers=4)
 
@@ -91,17 +91,17 @@ if __name__ == "__main__":
     DIDN_model = DIDN().to(device)
     DnCNN_model = DnCNN().to(device)
 
-    ResNet_path = './saved_models/ResNet18_20260202_0142_ep20_acc77.040.pth'
+    ResNet_path = './saved_models/ResNet18_20260205_0422_ep150_train_best_acc_100.000val_best_acc88.400.pth'
     ResNet_model.load_state_dict(torch.load(ResNet_path, map_location=device))
 
-    epochs = 20
+    epochs = 100
 
     criterion_task1 = nn.L1Loss()
     criterion_task2 = nn.CrossEntropyLoss()
     mtl_loss = UncertaintyWeightingLoss(task_num=2).to(device)
 
     optimizer = torch.optim.Adam([
-        {'params':DnCNN_model.parameters()}, 
+        {'params':DIDN_model.parameters()}, 
         {'params':mtl_loss.parameters(), 'lr':1e-3}
         ],lr=1e-4)
 
@@ -111,6 +111,7 @@ if __name__ == "__main__":
 
     for epoch in range(epochs):
         DnCNN_model.train()
+        DIDN_model.train()
         ResNet_model.eval()
 
         train_loss = 0.0
@@ -123,7 +124,7 @@ if __name__ == "__main__":
 
             optimizer.zero_grad()
 
-            denoised_imgs = DnCNN_model(corrupted_imgs)
+            denoised_imgs = DIDN_model(corrupted_imgs)
             resnet_input = torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616)).to(device)(denoised_imgs)
             outputs = ResNet_model(resnet_input)
 
@@ -141,6 +142,7 @@ if __name__ == "__main__":
         
         loss_list.append(train_loss / len(CIFAR10_train_dataloader))
 
+        DIDN_model.eval()
         DnCNN_model.eval()
         initial_psnr = 0.0
         final_psnr = 0.0
@@ -152,7 +154,7 @@ if __name__ == "__main__":
                 corrupted_imgs = corrupted_imgs.to(device)
                 clean_imgs = clean_imgs.to(device)
 
-                denoised_imgs = DnCNN_model(corrupted_imgs)
+                denoised_imgs = DIDN_model(corrupted_imgs)
 
                 for i in range(corrupted_imgs.size(0)):
                     initial_psnr += psnr(corrupted_imgs[i], clean_imgs[i]).item()
@@ -181,20 +183,20 @@ if __name__ == "__main__":
 
     # 保存模型
     save_folder = './saved_models'
-    model_name = 'DnCNN_train_freeze'
+    model_name = 'DIDN_train_freeze'
     epoch = epochs
     timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
 
     os.makedirs(save_folder, exist_ok=True)
     filename = f"{model_name}_{timestamp}_ep{epoch}_loss{loss_list[-1]:.4f}_best_psnr{best_psnr:.2f}dB_best_ssim{best_ssim:.2f}.pth"
     save_path = os.path.join(save_folder, filename)
-    torch.save(DnCNN_model.state_dict(), save_path)
+    torch.save(DIDN_model.state_dict(), save_path)
 
     print(f"模型参数以保存至: {save_path}")
 
     run_log = {
         "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "model": "DnCNN_train_freeze",
+        "model": "DIDN_train_freeze",
         "epochs": epochs,
         "optimizer": "Adam",
         "lr": 1e-4,
