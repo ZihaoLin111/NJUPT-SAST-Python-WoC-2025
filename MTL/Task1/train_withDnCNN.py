@@ -32,7 +32,7 @@ def psnr(img1, img2):
     
 data_path = 'data/SIDD_Small_sRGB_Only'
 
-full_dataset = SIDD_Dataset(data_path, transform=transform, crop_size=512)
+full_dataset = SIDD_Dataset(data_path, transform=transform, crop_size=64)
 
 train_size = int(0.8 * len(full_dataset))
 val_size = int(0.1 * len(full_dataset))
@@ -45,7 +45,7 @@ train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=8, shuffle=
 val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=8, shuffle=False)
 test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=8, shuffle=False)
 
-epochs = 10
+epochs = 150
 loss_list = []
 psnr_list = []
 for epoch in range(epochs):

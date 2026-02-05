@@ -2,9 +2,9 @@ import torch
 import torch.nn as nn
 import torchvision
 import matplotlib.pyplot as plt
-from model import Net
+from model import Net, ResNet18
 
-model_path = './saved_models/Net_20251221_1533_ep10_acc65.660.pth'
+model_path = './saved_models/ResNet18_20260205_0422_ep150_train_best_acc_100.000val_best_acc88.400.pth'
 
 transform = torchvision.transforms.Compose([
     torchvision.transforms.ToTensor(),
@@ -27,7 +27,7 @@ testloader = torch.utils.data.DataLoader(
 )
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-net = Net().to(device)
+net = ResNet18().to(device)
 state_dict = torch.load(model_path, map_location=device)
 net.load_state_dict(state_dict)
 
