@@ -11,3 +11,4 @@
 {"timestamp": "2025-12-26 03:43:12", "model": "DIDN", "epochs": 20, "optimizer": "Adam", "lr": 0.001, "train_loss_last": 0.01345894200494513, "val_psnr_last": 33.66596961021423}
 {"timestamp": "2026-01-30 20:19:11", "model": "DIDN", "epochs": 10, "optimizer": "Adam", "lr": 0.0001, "train_loss_last": 0.0112300389300799, "val_psnr_last": 38.76899313926697}
 {"timestamp": "2026-01-31 04:36:27", "model": "DuDnCNN", "epochs": 20, "optimizer": "Adam", "lr": 0.0001, "train_loss_last": 0.00950306530285161, "val_psnr_last": 39.553618133068085}
+{"timestamp": "2026-02-06 05:39:31", "model": "DnCNN", "epochs": 150, "optimizer": "Adam", "lr": 0.0001, "train_loss_last": 0.015837006689980625, "val_psnr_best": 33.77634418010712, "val_ssim_best": 0.8533883895725012}
