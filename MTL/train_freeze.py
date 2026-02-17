@@ -67,15 +67,15 @@ full_cifar10_dataset = PairedCIFAR10(
     corrupted_path=corrupted_path,
     transform=CIFAR10_train_transform,
     corruption_type="gaussian_noise",
-    severity=1
+    severity=3
 )
 
-CIFAR10_train_size = int(0.9 * len(full_cifar10_dataset))
+CIFAR10_train_size = int(0.8 * len(full_cifar10_dataset))
 CIFAR10_val_size = len(full_cifar10_dataset) - CIFAR10_train_size
 CIFAR10_train_dataset, CIFAR10_val_dataset = torch.utils.data.random_split(full_cifar10_dataset, [CIFAR10_train_size, CIFAR10_val_size])
 CIFAR10_val_dataset.dataset.transform = CIFAR10_val_transform
-CIFAR10_train_dataloader = DataLoader(CIFAR10_train_dataset, batch_size=256, shuffle=True, num_workers=4)
-CIFAR10_val_dataloader = DataLoader(CIFAR10_val_dataset, batch_size=256, shuffle=False, num_workers=4)
+CIFAR10_train_dataloader = DataLoader(CIFAR10_train_dataset, batch_size=128, shuffle=True, num_workers=4)
+CIFAR10_val_dataloader = DataLoader(CIFAR10_val_dataset, batch_size=128, shuffle=False, num_workers=4)
 
 def psnr(img1, img2):
     mse = torch.mean((img1 - img2) ** 2)
@@ -91,27 +91,35 @@ if __name__ == "__main__":
     DIDN_model = DIDN().to(device)
     DnCNN_model = DnCNN().to(device)
 
+    DnCNN_path = './saved_models/DnCNN(for32*32)_20260206_2111_ep150_loss0.0220_best_psnr32.56dB_best_ssim0.83.pth'
+    DnCNN_model.load_state_dict(torch.load(DnCNN_path, map_location=device))
     ResNet_path = './saved_models/ResNet18_20260205_0422_ep150_train_best_acc_100.000val_best_acc88.400.pth'
     ResNet_model.load_state_dict(torch.load(ResNet_path, map_location=device))
 
-    epochs = 100
+    epochs = 150
 
     criterion_task1 = nn.L1Loss()
     criterion_task2 = nn.CrossEntropyLoss()
     mtl_loss = UncertaintyWeightingLoss(task_num=2).to(device)
 
     optimizer = torch.optim.Adam([
-        {'params':DIDN_model.parameters()}, 
+        {'params':DnCNN_model.parameters()}, 
         {'params':mtl_loss.parameters(), 'lr':1e-3}
         ],lr=1e-4)
+    
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+        optimizer,
+        T_max=epochs, 
+        eta_min=1e-6        
+    )
 
     loss_list = []
     psnr_list = []
     ssim_list = []
+    acc_list = []
 
     for epoch in range(epochs):
         DnCNN_model.train()
-        DIDN_model.train()
         ResNet_model.eval()
 
         train_loss = 0.0
@@ -124,7 +132,7 @@ if __name__ == "__main__":
 
             optimizer.zero_grad()
 
-            denoised_imgs = DIDN_model(corrupted_imgs)
+            denoised_imgs = DnCNN_model(corrupted_imgs)
             resnet_input = torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616)).to(device)(denoised_imgs)
             outputs = ResNet_model(resnet_input)
 
@@ -132,29 +140,50 @@ if __name__ == "__main__":
             loss_task2 = criterion_task2(outputs, labels)
 
             losses = [loss_task1, loss_task2]
-            total_loss = loss_task1 + loss_task2 * 0.25
 
+            if batch_idx < 50:
+                w = 0.5
+            elif batch_idx < 100:
+                w = 0.75
+            else:
+                w = 1.0
+
+            total_loss = loss_task1 + loss_task2 * w
             total_loss.backward()
             optimizer.step()
+            scheduler.step()
 
             train_loss += total_loss.item()
-            pbar.set_description(f"Epoch {epoch+1}/{epochs}, Loss: {train_loss/(batch_idx+1):.4f}")
+            pbar.set_description(f"Epoch {epoch+1}/{epochs}, Loss: {train_loss/(batch_idx+1):.4f}, Task1 Loss: {loss_task1.item():.4f}, Task2 Loss: {loss_task2.item():.4f}")
         
         loss_list.append(train_loss / len(CIFAR10_train_dataloader))
 
-        DIDN_model.eval()
+ 
         DnCNN_model.eval()
         initial_psnr = 0.0
         final_psnr = 0.0
         initial_ssim = 0.0
         final_ssim = 0.0
+        initial_correct = 0
+        final_correct = 0
         count = 0
         with torch.no_grad():
             for batch_idx, (corrupted_imgs, clean_imgs, labels) in enumerate(CIFAR10_val_dataloader):
                 corrupted_imgs = corrupted_imgs.to(device)
                 clean_imgs = clean_imgs.to(device)
 
-                denoised_imgs = DIDN_model(corrupted_imgs)
+                denoised_imgs = DnCNN_model(corrupted_imgs)
+                
+                resnet_input = torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616)).to(device)(corrupted_imgs)
+                outputs_initial = ResNet_model(resnet_input)
+                _, predicted_initial = torch.max(outputs_initial.data, 1)
+                
+                resnet_input = torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616)).to(device)(denoised_imgs)
+                outputs_denoised = ResNet_model(resnet_input)
+                _, predicted_denoised = torch.max(outputs_denoised.data, 1)
+
+                initial_correct += (predicted_initial == labels.to(device)).sum().item()
+                final_correct += (predicted_denoised == labels.to(device)).sum().item() 
 
                 for i in range(corrupted_imgs.size(0)):
                     initial_psnr += psnr(corrupted_imgs[i], clean_imgs[i]).item()
@@ -162,6 +191,8 @@ if __name__ == "__main__":
                     initial_ssim += ssim(corrupted_imgs[i].unsqueeze(0), clean_imgs[i].unsqueeze(0), data_range=1.0, size_average=True).item()
                     final_ssim += ssim(denoised_imgs[i].unsqueeze(0), clean_imgs[i].unsqueeze(0), data_range=1.0, size_average=True).item()
                     count += 1
+                
+                
 
 
         initial_psnr = initial_psnr / count
@@ -169,40 +200,47 @@ if __name__ == "__main__":
         initial_ssim = initial_ssim / count
         final_ssim = final_ssim / count
 
+        initial_acc = initial_correct / count * 100.0
+        final_acc = final_correct / count * 100.0
+
+        acc_list.append(final_acc)
         psnr_list.append(final_psnr)
         ssim_list.append(final_ssim)
 
         print(f"Epoch {epoch+1}/{epochs}, Train Loss: {train_loss/len(CIFAR10_train_dataloader):.4f}")
         print(f"Validation - Initial PSNR {initial_psnr:.4f} => Denoised PSNR {final_psnr:.4f}")
         print(f"Validation - Initial SSIM {initial_ssim:.4f} => Denoised SSIM {final_ssim:.4f}")
+        print(f"Validation - Initial Acc {initial_acc:.2f}% => Denoised Acc {final_acc:.2f}%")
 
 
     best_psnr = max(psnr_list)
     best_epoch = psnr_list.index(best_psnr) + 1
     best_ssim = ssim_list[best_epoch - 1]
+    best_acc = max(acc_list)
 
     # 保存模型
     save_folder = './saved_models'
-    model_name = 'DIDN_train_freeze'
+    model_name = 'DnCNN_train_freeze'
     epoch = epochs
     timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
 
     os.makedirs(save_folder, exist_ok=True)
     filename = f"{model_name}_{timestamp}_ep{epoch}_loss{loss_list[-1]:.4f}_best_psnr{best_psnr:.2f}dB_best_ssim{best_ssim:.2f}.pth"
     save_path = os.path.join(save_folder, filename)
-    torch.save(DIDN_model.state_dict(), save_path)
+    torch.save(DnCNN_model.state_dict(), save_path)
 
     print(f"模型参数以保存至: {save_path}")
 
     run_log = {
         "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "model": "DIDN_train_freeze",
+        "model": "DnCNN_train_freeze",
         "epochs": epochs,
         "optimizer": "Adam",
         "lr": 1e-4,
         "train_loss_last": loss_list[-1],
         "best_psnr": best_psnr,
         "best_ssim": best_ssim,
+        "best_acc": best_acc
         }
 
     # 保存JSONL
@@ -231,4 +269,15 @@ if __name__ == "__main__":
     plt.legend()
     plt.grid()
     plt.savefig(f'psnr_curve_{timestamp}.png')
+    plt.close()
+
+    # Acc曲线
+    plt.figure()
+    plt.plot(range(1, epochs + 1), acc_list, label='Accuracy')
+    plt.title('Validation Accuracy Curve')
+    plt.xlabel('Epoch')
+    plt.ylabel('Accuracy (%)')
+    plt.legend()
+    plt.grid()
+    plt.savefig(f'acc_curve_{timestamp}.png')
     plt.close()

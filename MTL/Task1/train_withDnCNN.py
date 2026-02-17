@@ -147,7 +147,7 @@ train_dataset = SIDD_Dataset_Crop(
     data_path, 
     scene_list=train_scenes, 
     transform=transform, 
-    crop_size=64, 
+    crop_size=32, 
     train=True, 
     repeat=10
 )
@@ -156,13 +156,13 @@ val_dataset = SIDD_Dataset_Crop(
     data_path, 
     scene_list=val_scenes, 
     transform=transform, 
-    crop_size=64, 
+    crop_size=32, 
     train=False, 
     repeat=1
 )
 
-train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=64, shuffle=True, num_workers=0)
-val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=64, shuffle=False, num_workers=0)
+train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=128, shuffle=True, num_workers=0)
+val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=128, shuffle=False, num_workers=0)
 
 
 loss_list = []
@@ -236,7 +236,7 @@ epoch = epochs
 timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M")
 
 os.makedirs(save_folder, exist_ok=True)
-filename = f"{model_name}_{timestamp}_ep{epoch}_loss{loss_list[-1]:.4f}_best_psnr{best_psnr:.2f}dB_best_ssim{best_ssim:.2f}.pth"
+filename = f"{model_name}(for32*32)_{timestamp}_ep{epoch}_loss{loss_list[-1]:.4f}_best_psnr{best_psnr:.2f}dB_best_ssim{best_ssim:.2f}.pth"
 save_path = os.path.join(save_folder, filename)
 torch.save(net.state_dict(), save_path)
 
