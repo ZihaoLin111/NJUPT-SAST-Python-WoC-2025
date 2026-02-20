@@ -1,9 +1,3 @@
-{"timestamp": "2026-01-31 19:43:42", "model": "MTL", "epochs": 20, "optimizer": "Adam", "lr": 0.0001, "train_loss_last": 0.04638388448617828, "val_psnr_last": 39.824408531188965}
-{"timestamp": "2026-02-02 19:18:47", "model": "MTL", "epochs": 20, "optimizer": "Adam", "lr": 0.0001, "train_loss_last": 0.046937578875157565, "val_psnr_last": 34.02003759145737}
-{"timestamp": "2026-02-03 01:06:44", "model": "MTL", "epochs": 20, "optimizer": "Adam", "lr": 0.0001, "train_loss_last": 0.03868241442574395, "val_psnr_last": 31.85879957675934}
-{"timestamp": "2026-02-03 01:38:23", "model": "MTL", "epochs": 20, "optimizer": "Adam", "lr": 0.0001, "train_loss_last": 0.03808202987743749, "val_psnr_last": 32.08216917514801}
-{"timestamp": "2026-02-03 02:32:12", "model": "MTL", "epochs": 20, "optimizer": "Adam", "lr": 0.0001, "train_loss_last": -1.2516720129383936, "val_psnr_last": 32.90190154314041}
-{"timestamp": "2026-02-03 03:12:05", "model": "MTL", "epochs": 20, "optimizer": "Adam", "lr": 0.0001, "train_loss_last": -1.2652742995156183, "val_psnr_last": 32.416308879852295}
 {"timestamp": "2026-02-05 02:06:08", "model": "DnCNN_train_freeze", "epochs": 20, "optimizer": "Adam", "lr": 0.0001, "train_loss_last": 0.10725942129890124, "best_psnr": 20.380882514953612, "best_ssim": 0.7853133601695299}
 {"timestamp": "2026-02-05 12:39:26", "model": "DnCNN_train_freeze", "epochs": 100, "optimizer": "Adam", "lr": 0.0001, "train_loss_last": 0.04062809691660934, "best_psnr": 27.05613555717468, "best_ssim": 0.8675356442928315}
 {"timestamp": "2026-02-05 14:09:36", "model": "DIDN_train_freeze", "epochs": 100, "optimizer": "Adam", "lr": 0.0001, "train_loss_last": 0.020740728514889877, "best_psnr": 31.79800365638733, "best_ssim": 0.9509697327017784}

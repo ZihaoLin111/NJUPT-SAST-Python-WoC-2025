@@ -163,39 +163,3 @@ resize_gt.save('resized_gt.png')
 noisy_image_copy.save('noisy.png')
 noisy_image_re_copy.save('noisy_re.png')
 print('图片已保存')
-
-
-# # 画图再议，在想要不要多训练几个模型然后画图比较测试结果
-# # 画图的代码直接让AI帮忙改好的()
-
-# epochs_range = range(1, epochs + 1)
-
-# fig, ax1 = plt.subplots()
-# # 左 y 轴：PSNR
-# ax1.plot(epochs_range, psnr_list, label='PSNR (dB)', color='tab:blue')
-# ax1.set_xlabel('Epoch')
-# ax1.set_ylabel('PSNR (dB)', color='tab:blue')
-# ax1.tick_params(axis='y', labelcolor='tab:blue')
-
-# # 右 y 轴：SSIM
-# ax2 = ax1.twinx()
-# ax2.plot(epochs_range, ssim_list, label='SSIM', color='tab:orange')
-# ax2.set_ylabel('SSIM', color='tab:orange')
-# ax2.tick_params(axis='y', labelcolor='tab:orange')
-# ax2.set_ylim(0, 1)   
-
-# # 标题
-# plt.title('PSNR and SSIM over Epochs')
-
-# # 合并图例
-# lines_1, labels_1 = ax1.get_legend_handles_labels()
-# lines_2, labels_2 = ax2.get_legend_handles_labels()
-# ax1.legend(lines_1 + lines_2, labels_1 + labels_2, loc='best')
-
-# # 保存
-# os.makedirs('test_result_charts', exist_ok=True)
-# timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-# fig_path = f"test_result_charts/train_val_PSNR_SSIM_{timestamp}.png"
-# plt.savefig(fig_path, dpi=300, bbox_inches='tight')
-
-# plt.show()
