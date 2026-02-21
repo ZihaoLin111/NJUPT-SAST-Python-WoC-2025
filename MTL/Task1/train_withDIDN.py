@@ -129,17 +129,8 @@ with open(jsonl_path, "a", encoding="utf-8") as f:
     f.write(json.dumps(run_log) + "\n")
 
 
-# 记录到 CSV
-csv_path = "runs.csv"
-csv_fields = ["timestamp", "model", "epochs", "optimizer", "lr", "train_loss_last", "val_psnr_last"]
-file_exists = os.path.exists(csv_path)
-with open(csv_path, "a", newline="", encoding="utf-8") as f:
-    writer = csv.DictWriter(f, fieldnames=csv_fields)
-    if not file_exists:
-        writer.writeheader()
-    writer.writerow({k: run_log[k] for k in csv_fields})
 
-print("Logged to", jsonl_path, "and", csv_path)
+print("Logged to", jsonl_path)
 
 epochs_range = range(1, epochs + 1)
 

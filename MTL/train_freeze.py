@@ -72,7 +72,7 @@ full_cifar10_dataset = PairedCIFAR10(
 
 CIFAR10_train_size = int(0.8 * len(full_cifar10_dataset))
 CIFAR10_val_size = len(full_cifar10_dataset) - CIFAR10_train_size
-CIFAR10_train_dataset, CIFAR10_val_dataset = torch.utils.data.random_split(full_cifar10_dataset, [CIFAR10_train_size, CIFAR10_val_size])
+CIFAR10_train_dataset, CIFAR10_val_dataset = torch.utils.data.random_split(full_cifar10_dataset, [CIFAR10_train_size, CIFAR10_val_size],generator=torch.Generator().manual_seed(42))
 CIFAR10_val_dataset.dataset.transform = CIFAR10_val_transform
 CIFAR10_train_dataloader = DataLoader(CIFAR10_train_dataset, batch_size=128, shuffle=True, num_workers=4)
 CIFAR10_val_dataloader = DataLoader(CIFAR10_val_dataset, batch_size=128, shuffle=False, num_workers=4)
@@ -148,7 +148,7 @@ if __name__ == "__main__":
             else:
                 w = 1.0
 
-            total_loss = loss_task1 + loss_task2 * w
+            total_loss = mtl_loss(losses)
             total_loss.backward()
             optimizer.step()
             scheduler.step()
@@ -220,7 +220,7 @@ if __name__ == "__main__":
 
     # 保存模型
     save_folder = './saved_models'
-    model_name = 'DnCNN_train_freeze'
+    model_name = 'DnCNN_train_freeze_ResNet18_uncertain_loss'
     epoch = epochs
     timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
 
@@ -233,7 +233,7 @@ if __name__ == "__main__":
 
     run_log = {
         "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "model": "DnCNN_train_freeze",
+        "model": model_name,
         "epochs": epochs,
         "optimizer": "Adam",
         "lr": 1e-4,

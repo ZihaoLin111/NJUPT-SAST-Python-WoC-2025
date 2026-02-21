@@ -1,3 +1,5 @@
+from unittest import loader
+
 from matplotlib.pylab import f
 import torch
 import torch.nn as nn
@@ -64,17 +66,61 @@ corrupted_path = "MTL/data/CIFAR-10-C"
 
 
 
-cifar10c_dataset = PairedCIFAR10(
+cifar10c_dataset_1 = PairedCIFAR10(
+    clean_path, 
+    corrupted_path, 
+    transform=CIFAR10_val_transform, 
+    corruption_type="gaussian_noise", 
+    severity=1
+)
+cifar10c_dataset_2 = PairedCIFAR10(
+    clean_path, 
+    corrupted_path, 
+    transform=CIFAR10_val_transform, 
+    corruption_type="gaussian_noise", 
+    severity=2
+)
+cifar10c_dataset_3 = PairedCIFAR10(
     clean_path, 
     corrupted_path, 
     transform=CIFAR10_val_transform, 
     corruption_type="gaussian_noise", 
     severity=3
 )
+cifar10c_dataset_4 = PairedCIFAR10(
+    clean_path, 
+    corrupted_path, 
+    transform=CIFAR10_val_transform, 
+    corruption_type="gaussian_noise", 
+    severity=4
+)
+cifar10c_dataset_5 = PairedCIFAR10(
+    clean_path, 
+    corrupted_path, 
+    transform=CIFAR10_val_transform, 
+    corruption_type="gaussian_noise", 
+    severity=5
+)
 
-cifar10_loader = DataLoader(cifar10_testset, batch_size=128, shuffle=False, num_workers=4)
 
-cifar10c_loader = DataLoader(cifar10c_dataset, batch_size=128, shuffle=False, num_workers=4)
+CIFAR10_train_size = int(0.8 * len(cifar10_testset))
+CIFAR10_val_size = len(cifar10_testset) - CIFAR10_train_size
+_,cifar10_test_0 = torch.utils.data.random_split(cifar10_testset, [CIFAR10_train_size, CIFAR10_val_size],generator=torch.Generator().manual_seed(42))
+_,cifar10_test_1 = torch.utils.data.random_split(cifar10c_dataset_1, [CIFAR10_train_size, CIFAR10_val_size],generator=torch.Generator().manual_seed(42))
+_,cifar10_test_2 = torch.utils.data.random_split(cifar10c_dataset_2, [CIFAR10_train_size, CIFAR10_val_size],generator=torch.Generator().manual_seed(42))
+_,cifar10_test_3 = torch.utils.data.random_split(cifar10c_dataset_3, [CIFAR10_train_size, CIFAR10_val_size],generator=torch.Generator().manual_seed(42))
+_,cifar10_test_4 = torch.utils.data.random_split(cifar10c_dataset_4, [CIFAR10_train_size, CIFAR10_val_size],generator=torch.Generator().manual_seed(42))
+_,cifar10_test_5 = torch.utils.data.random_split(cifar10c_dataset_5, [CIFAR10_train_size, CIFAR10_val_size],generator=torch.Generator().manual_seed(42))
+
+
+cifar10_loader = DataLoader(cifar10_test_0, batch_size=128, shuffle=False, num_workers=4)
+cifar10c1_loader = DataLoader(cifar10_test_1, batch_size=128, shuffle=False, num_workers=4)
+cifar10c2_loader = DataLoader(cifar10_test_2, batch_size=128, shuffle=False, num_workers=4)
+cifar10c3_loader = DataLoader(cifar10_test_3, batch_size=128, shuffle=False, num_workers=4)
+cifar10c4_loader = DataLoader(cifar10_test_4, batch_size=128, shuffle=False, num_workers=4)
+cifar10c5_loader = DataLoader(cifar10_test_5, batch_size=128, shuffle=False, num_workers=4)
+
+loaders = [cifar10c1_loader, cifar10c2_loader, cifar10c3_loader, cifar10c4_loader, cifar10c5_loader]
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -92,38 +138,42 @@ if __name__ == "__main__":
     DnCNN_model = DnCNN().to(device)
     ResNet_path = './saved_models/ResNet18_20260205_0422_ep150_train_best_acc_100.000val_best_acc88.400.pth'
     resnet_model.load_state_dict(torch.load(ResNet_path))
-    DnCNN_path = './saved_models/DnCNN_train_freeze_20260207_003904_ep150_loss0.2808_best_psnr22.92dB_best_ssim0.74.pth'
+    DnCNN_path = './saved_models/DnCNN_train_freeze_ResNet18_uncertain_loss_20260221_233117_ep150_loss-2.3083_best_psnr22.51dB_best_ssim0.73.pth'
     DnCNN_model.load_state_dict(torch.load(DnCNN_path))
     DnCNN_model.eval()
     resnet_model.eval()
-    correct = 0
-    total = 0
-    initial_psnr = 0
-    initial_ssim = 0
-    final_psnr = 0
-    final_ssim = 0
-    count_ = 0
-    with torch.no_grad():
-        for corrupted_imgs, clean_imgs, labels in tqdm.tqdm(cifar10c_loader):
-            corrupted_imgs = corrupted_imgs.to(device)
-            labels = labels.to(device)
 
-            denoised_imgs = DnCNN_model(corrupted_imgs)
-            classify_input = torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616)).to(device)(denoised_imgs)
-            outputs = resnet_model(classify_input)
+    for i in range(5):
+        print(f"Evaluating on Dataset {i+1}...")
+        Loader = loaders[i]
+        correct = 0
+        total = 0
+        initial_psnr = 0
+        initial_ssim = 0
+        final_psnr = 0
+        final_ssim = 0
+        count_ = 0
+        with torch.no_grad():
+            for corrupted_imgs, clean_imgs, labels in tqdm.tqdm(Loader):
+                corrupted_imgs = corrupted_imgs.to(device)
+                labels = labels.to(device)
 
-            for i in range(corrupted_imgs.size(0)):
-                initial_psnr += psnr(corrupted_imgs[i], clean_imgs[i].to(device)).item()
-                initial_ssim += ssim(corrupted_imgs[i].unsqueeze(0), clean_imgs[i].unsqueeze(0).to(device)).item()
-                final_psnr += psnr(denoised_imgs[i], clean_imgs[i].to(device)).item()
-                final_ssim += ssim(denoised_imgs[i].unsqueeze(0), clean_imgs[i].unsqueeze(0).to(device)).item()
-                count_ += 1
+                denoised_imgs = DnCNN_model(corrupted_imgs)
+                classify_input = torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616)).to(device)(denoised_imgs)
+                outputs = resnet_model(classify_input)
 
-            _, predicted = torch.max(outputs.data, 1)
-            total += labels.size(0)
-            correct += (predicted == labels).sum().item()
+                for i in range(corrupted_imgs.size(0)):
+                    initial_psnr += psnr(corrupted_imgs[i], clean_imgs[i].to(device)).item()
+                    initial_ssim += ssim(corrupted_imgs[i].unsqueeze(0), clean_imgs[i].unsqueeze(0).to(device)).item()
+                    final_psnr += psnr(denoised_imgs[i], clean_imgs[i].to(device)).item()
+                    final_ssim += ssim(denoised_imgs[i].unsqueeze(0), clean_imgs[i].unsqueeze(0).to(device)).item()
+                    count_ += 1
 
-    print(f"PSNR: Initial: {initial_psnr / count_:.2f} dB => Final: {final_psnr / count_:.2f} dB")
-    print(f"SSIM: Initial: {initial_ssim / count_:.4f} => Final: {final_ssim / count_:.4f}")
-    print(f"Accuracy on CIFAR-10-C (Gaussian Noise, Severity 3): {100 * correct / total:.2f}%")
+                _, predicted = torch.max(outputs.data, 1)
+                total += labels.size(0)
+                correct += (predicted == labels).sum().item()
+
+        print(f"PSNR: Initial: {initial_psnr / count_:.2f} dB => Final: {final_psnr / count_:.2f} dB")
+        print(f"SSIM: Initial: {initial_ssim / count_:.4f} => Final: {final_ssim / count_:.4f}")
+        print(f"Accuracy on CIFAR-10-C (Gaussian Noise, Severity {i+1}): {100 * correct / total:.2f}%")
 
