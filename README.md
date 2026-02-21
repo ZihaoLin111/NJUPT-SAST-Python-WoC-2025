@@ -80,13 +80,16 @@ DnCNN预测的是图片的噪声，最后输出结果为“含噪声的原图”
 
 此项目中我采用了CIFAR10-C数据集[^5]用于多任务学习，该数据集包含了CIFAR-10测试集的10种不同类型的常见图像损坏，每种类型又包含了5个不同程度的损坏，分别为1-5级，级别越高损坏程度越严重。该项目中使用的损坏类型为Gaussian Noise，级别为3
 
-训练时我将损坏图像输入到DnCNN中，得到去噪后的图像，再将去噪后的图像输入到ResNet18中，得到分类结果。损失函数由两部分组成：去噪损失$\mathcal{L}_{D}$和分类损失$\mathcal{L}_{C}$，去噪损失使用均方误差（MSE），分类损失使用交叉熵损失（Cross-Entropy Loss）。在训练过程中，我冻结了ResNet18的参数，只更新DnCNN的参数，以使得DnCNN能够针对性地输出最易于ResNet18识别的图像。
+训练时我将损坏图像输入到DnCNN中，得到去噪后的图像，再将去噪后的图像输入到ResNet18中，得到分类结果。损失函数由两部分组成：去噪损失 $\mathcal{L}_{D}$ 和分类损失 $\mathcal{L}_{C}$ ，去噪损失使用均方误差（MSE），分类损失使用交叉熵损失（Cross-Entropy Loss）。在训练过程中，我冻结了ResNet18的参数，只更新DnCNN的参数，以使得DnCNN能够针对性地输出最易于ResNet18识别的图像。
 
 #### 3.3.Loss设置
 在训练中我使用了三种权重组合:
-1）固定权重$$\mathcal{L}_{Total} = \mathcal{L}_D + \mathcal{L}_C * 0.5$$
-2）动态权重$\omega$=[0.5, 0.75, 1.0]，根据epoch数而改变$$\mathcal{L}_{Total} = \mathcal{L}_D + \mathcal{L}_C * \omega$$
-3）不确定权重[^6]$$\mathcal{L}_{Total} = \frac{1}{2\sigma^2_1}\mathcal{L}_D+\frac{1}{2\sigma^2_2}\mathcal{L}_C+\log(\sigma_1\sigma_2)$$
+1）固定权重
+$$\mathcal{L}_{Total} = \mathcal{L}_D + \mathcal{L}_C * 0.5$$
+2）动态权重 $\omega$ =[0.5, 0.75, 1.0]，根据epoch数而改变
+$$\mathcal{L}_{Total} = \mathcal{L}_D + \mathcal{L}_C * \omega$$
+3）不确定权重[^6]
+$$\mathcal{L}_{Total} = \frac{1}{2\sigma^2_1}\mathcal{L}_D+\frac{1}{2\sigma^2_2}\mathcal{L}_C+\log(\sigma_1\sigma_2)$$
 
 #### 3.4.训练细节
 我使用了Adam优化器，初始学习率为1e-4，使用余弦退火，学习率下限为1e-6
@@ -104,14 +107,19 @@ DnCNN预测的是图片的噪声，最后输出结果为“含噪声的原图”
 使用多任务学习方法和三种Loss设置微调DnCNN后在CIFAR10-C的Gaussian Noise上进行测试
 |   Severity   |  Loss 1 Accuracy   |  Loss 2 Accuracy   |  Loss 3 Accuracy   |
 | ---- | ---- | ---- | ---- |
-|   1   |   75.40%   |   77.05%   | 
-|   2   |   74.20%   |   73.65%   |
-|   3   |   71.90%   |   72.45%   |
-|   4   |   69.55%   |   68.85%   |
-|   5   |   66.10%   |   64.80%   |
+|   1   |   75.40%   |   77.05%   |   75.75%   | 
+|   2   |   74.20%   |   73.65%   |   73.45%   |
+|   3   |   71.90%   |   72.45%   |   72.60%   |
+|   4   |   69.55%   |   68.85%   |   68.35%   |
+|   5   |   66.10%   |   64.80%   |   65.30%   |
 
 ### 5.结论
 通过多任务学习方法微调去噪网络，我们成功提升了预训练分类模型在受损图像上的准确率，尤其是在损坏程度较高的情况下，准确率提升显著。这表明针对性地优化去噪网络以适应分类任务的需求，可以有效增强模型在特定任务场景下的性能。
+
+### 6.局限与未来工作
+该项目在低损坏程度的图像上提升有限，未来可以探索更复杂的去噪网络，以进一步提升模型在低损坏程度的图像上的表现。此外，未来还可以尝试在其他类型的损坏上进行类似的多任务学习，以验证方法的泛化能力。
+
+训练时得到的图表表明，验证集的准确率在最初就已经到达较高的水平，但后续的训练并没有带来显著提升，甚至在某些阶段出现了过拟合的迹象。亟需更多实验探索背后原因并改善方法。
 
 
 [^1]: K. Zhang, W. Zuo, Y. Chen, D. Meng and L. Zhang, "Beyond a Gaussian Denoiser: Residual Learning of Deep CNN for Image Denoising," in IEEE Transactions on Image Processing, vol. 26, no. 7, pp. 3142-3155, July 2017.
