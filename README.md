@@ -80,15 +80,21 @@ DnCNN预测的是图片的噪声，最后输出结果为“含噪声的原图”
 
 此项目中我采用了CIFAR10-C数据集[^5]用于多任务学习，该数据集包含了CIFAR-10测试集的10种不同类型的常见图像损坏，每种类型又包含了5个不同程度的损坏，分别为1-5级，级别越高损坏程度越严重。该项目中使用的损坏类型为Gaussian Noise，级别为3
 
-训练时我将损坏图像输入到DnCNN中，得到去噪后的图像，再将去噪后的图像输入到ResNet18中，得到分类结果。损失函数由两部分组成：去噪损失 $\mathcal{L}_{D}$ 和分类损失 $\mathcal{L}_{C}$ ，去噪损失使用均方误差（MSE），分类损失使用交叉熵损失（Cross-Entropy Loss）。在训练过程中，我冻结了ResNet18的参数，只更新DnCNN的参数，以使得DnCNN能够针对性地输出最易于ResNet18识别的图像。
+训练时我将损坏图像输入到DnCNN中，得到去噪后的图像，再将去噪后的图像输入到ResNet18中，得到分类结果。损失函数由两部分组成：去噪损失 $`\mathcal{L}_{D}`$ 和分类损失 $`\mathcal{L}_{C}`$ ，去噪损失使用均方误差（MSE），分类损失使用交叉熵损失（Cross-Entropy Loss）。在训练过程中，我冻结了ResNet18的参数，只更新DnCNN的参数，以使得DnCNN能够针对性地输出最易于ResNet18识别的图像。
 
 #### 3.3.Loss设置
 在训练中我使用了三种权重组合:
+
 1）固定权重
+
 $$\mathcal{L}_{Total} = \mathcal{L}_D + \mathcal{L}_C * 0.5$$
+
 2）动态权重 $\omega$ =[0.5, 0.75, 1.0]，根据epoch数而改变
+
 $$\mathcal{L}_{Total} = \mathcal{L}_D + \mathcal{L}_C * \omega$$
+
 3）不确定权重[^6]
+
 $$\mathcal{L}_{Total} = \frac{1}{2\sigma^2_1}\mathcal{L}_D+\frac{1}{2\sigma^2_2}\mathcal{L}_C+\log(\sigma_1\sigma_2)$$
 
 #### 3.4.训练细节
