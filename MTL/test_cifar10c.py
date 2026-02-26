@@ -1,22 +1,13 @@
-from unittest import loader
-
-from matplotlib.pylab import f
 import torch
 import torch.nn as nn
 import torchvision
 import tqdm
 from pytorch_msssim import ssim
-import datetime
 import os
-import json
-import matplotlib.pyplot as plt
 from model import DIDN, ResBlock, ResNet18, UncertaintyWeightingLoss, DnCNN
 import numpy as np
 from torch.utils.data import Dataset, DataLoader
-from PIL import Image
-from itertools import count, cycle
-import random
-from pcgrad import PCGrad
+
 
 class PairedCIFAR10(Dataset):
     def __init__(self, clean_path, corrupted_path, transform=None, corruption_type="gaussian_noise", severity=1):

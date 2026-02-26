@@ -1,5 +1,3 @@
-from calendar import c
-from matplotlib.pylab import f
 import torch
 import torch.nn as nn
 import torchvision
@@ -12,10 +10,6 @@ import matplotlib.pyplot as plt
 from model import DIDN, ResBlock, ResNet18, UncertaintyWeightingLoss, DnCNN
 import numpy as np
 from torch.utils.data import Dataset, DataLoader
-from PIL import Image
-from itertools import cycle
-import random
-from pcgrad import PCGrad
 
 
 class PairedCIFAR10(Dataset):
